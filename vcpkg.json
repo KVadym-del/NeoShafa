@@ -1,0 +1,7 @@
+{
+  "dependencies": [
+    "boost-program-options",
+    "ms-gsl",
+    "toml11"
+  ]
+}
