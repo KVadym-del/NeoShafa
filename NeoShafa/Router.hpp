@@ -37,6 +37,7 @@ namespace NeoShafa {
             }
 
             m_projectEnvironment.neoShafaPath = m_cmdArgs.at(0);
+			m_projectStatistics.projectCompilationData = m_projectCompilationData;
             m_projectDataScraper = { &m_projectEnvironment, &m_projectStatistics };
         }
 
@@ -122,7 +123,7 @@ namespace NeoShafa {
             m_projectConfigure.save_source_cache();
 
 #ifdef _WIN32
-            if (const auto res = m_projectConfigure.where_is_msvc();
+            if (const auto res = m_projectConfigure.where_is_cl();
                 !res
                 )
                 std::println("ERROR: {}", static_cast<int32_t>(res.error()));
@@ -163,6 +164,7 @@ namespace NeoShafa {
         program_options::options_description m_description{ "Allowed options" };
         program_options::variables_map m_variableMap{};
 
+		ProjectCompilationData m_projectCompilationData{};
         ProjectEnvironment m_projectEnvironment{};
         ProjectStatistics m_projectStatistics{};
 

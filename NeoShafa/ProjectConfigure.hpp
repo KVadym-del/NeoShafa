@@ -4,10 +4,14 @@
 #include <windows.h>
 #endif
 
+#include <boost/process.hpp>
+
 #include "Util.hpp"
 #include "ProjectData.hpp"
 
 namespace NeoShafa {
+	namespace BoostProcess = boost::process;
+
 	class ProjectConfigure {
 	public:
 		ProjectConfigure() = default;
@@ -15,7 +19,7 @@ namespace NeoShafa {
 
 		inline ProjectConfigure(
 			const ProjectEnvironment* projectEnvironment,
-			const ProjectStatistics* projectStatistics
+			ProjectStatistics* projectStatistics
 		) noexcept : m_projectEnvironment(projectEnvironment), m_projectStatistics(projectStatistics) {}
 
 		inline std::expected<void, Core::ProjectConfigureErrors> setup_project_folders()
@@ -180,19 +184,150 @@ namespace NeoShafa {
 			return differenceFiles;
 		}
 
-		inline std::expected<void, Core::ProjectConfigureErrors> where_is_msvc()
-		{
-			auto res = Util::download_file(
-				g_projectMsvcFinderUrl,
-				m_projectEnvironment->projectMsvcFinderFilePath
-			);
-			if (!res)
-			{
+		inline std::expected<std::string, Core::ProjectConfigureErrors> run_command(
+			const std::filesystem::path& executable,
+			const std::vector<std::string>& args
+		) {
+			if (!std::filesystem::exists(executable)) {
 				std::println(
-					"WARNING: Cennot download file with error code({}).",
-					static_cast<int32_t>(res.error())
+					std::cerr,
+					"ERROR: Executable not found at {}",\
+					executable.string()
+				);
+				return "";
+			}
+
+			BoostProcess::ipstream pipeStream{};
+			std::string out{};
+			try {
+				BoostProcess::child child{
+					executable.string(),
+					args,
+					BoostProcess::std_out > pipeStream
+				};
+
+				std::stringstream sstream{};
+				sstream << pipeStream.rdbuf();
+				out = sstream.str();
+
+				child.wait();
+				if (child.exit_code() != 0) {
+					std::println(
+						std::cerr,
+						"ERROR: {} exited with an error code: {}",
+						g_projectMsvcFinderFileName,
+						child.exit_code()
+					);
+				}
+			}
+			catch (const boost::process::process_error& error) {
+				std::println(
+					std::cerr,
+					"ERROR: Error executing vswhere.exe. Is it installed at the specified path?\n\t{}",
+					error.what()
 				);
 			}
+			if (!out.empty()) {
+				out.erase(out.find_last_not_of("\r\n") + 1);
+			}
+			return out;
+		}
+
+		inline std::expected<void, Core::ProjectConfigureErrors> where_is_cl()
+		{
+			if (!std::filesystem::exists(m_projectEnvironment->projectMsvcFinderFilePath))
+			{
+				auto res = Util::download_file(
+					g_projectMsvcFinderUrl,
+					m_projectEnvironment->projectMsvcFinderFilePath
+				);
+				if (!res)
+				{
+					std::println(
+						"WARNING: Cannot download file with error code({}).",
+						static_cast<int32_t>(res.error())
+					);
+				}
+			}
+
+			std::vector<std::string> vswhereArgs {
+				"-latest", "-prerelease", "-products", "*",
+				"-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+				"-property", "installationPath"
+			};
+
+			auto res = run_command(
+				m_projectEnvironment->projectMsvcFinderFilePath.string(),
+				vswhereArgs
+			);
+			if (!res) return std::unexpected(res.error());
+			
+			std::filesystem::path installDir = res.value();
+
+
+			if (installDir.empty()) {
+				std::println(
+					"ERROR: Could not find Visual Studio installation directory. Please ensure Visual Studio is installed and the required components are present."
+				);
+				return std::unexpected(Core::ProjectConfigureErrors::InvalidInstallationDirectoryError);
+			}
+
+			const std::string hostArch{ "HostX64" };
+			const std::string targetArch{ "x64" };
+
+			std::filesystem::path version_file{ 
+				installDir /
+				"VC" /
+				"Auxiliary" /
+				"Build" /
+				"Microsoft.VCToolsVersion.default.txt"
+			};
+			auto resFile = Util::read(version_file);
+			if (!resFile) {
+				std::println(
+					"ERROR: Could not read MSVC version file at: {}",
+					version_file.string()
+				);
+				return std::unexpected(Core::ProjectConfigureErrors::InvalidMsvcVersionError);
+			}
+
+			std::string msvcVersion = resFile.value().front();
+			if (msvcVersion.empty()) {
+				std::println(
+					"ERROR: Could not read MSVC version file at: {}",
+					version_file.string()
+				);
+				return std::unexpected(Core::ProjectConfigureErrors::InvalidMsvcVersionError);
+			}
+			boost::trim(msvcVersion);
+
+			std::filesystem::path cl_path{ 
+				installDir /
+				"VC" /
+				"Tools" /
+				"MSVC" /
+				msvcVersion /
+				"bin" /
+				hostArch /
+				targetArch / 
+				"cl.exe" 
+			};
+			
+			if (!std::filesystem::exists(cl_path)) {
+				std::println(
+					"ERROR: Could not find cl.exe at the expected path: {}",
+					cl_path.string()
+				);
+				return std::unexpected(Core::ProjectConfigureErrors::InvalidClPathError);
+			}
+
+			m_projectStatistics->projectCompilationData.cCompilerPath = cl_path.string();
+			m_projectStatistics->projectCompilationData.cppCompilerPath = cl_path.string();
+			
+
+			std::println("INFO: Compiler paths set to: cCompilerPath = {}, cppCompilerPath = {}",
+				m_projectStatistics->projectCompilationData.cCompilerPath,
+				m_projectStatistics->projectCompilationData.cppCompilerPath);
 
 			return {};
 		}
@@ -219,7 +354,7 @@ namespace NeoShafa {
 
 	private:
 		const ProjectEnvironment* m_projectEnvironment{};
-		const ProjectStatistics* m_projectStatistics{};
+		ProjectStatistics* m_projectStatistics{};
 
 		constexpr static const char m_sourceCacheDelimiter{ '@' };
 

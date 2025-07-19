@@ -81,9 +81,11 @@ namespace NeoShafa {
 
 		std::string cCompilerVersion{};
 		std::string cCompilerFlags{};
+		std::string cCompilerPath{};
 
 		std::string cppCompilerVersion{};
 		std::string cppCompilerFlags{};
+		std::string cppCompilerPath{};
 	};
 
 	struct ProjectStatistics {

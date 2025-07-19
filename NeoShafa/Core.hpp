@@ -56,6 +56,10 @@ namespace NeoShafa::Core {
         SetFileAttributesError,
 
         ReadingProjecCahedSourceError,
+
+        InvalidInstallationDirectoryError,
+        InvalidMsvcVersionError,
+        InvalidClPathError,
     };
 
     enum class ProjectBuildErrors : int32_t {
