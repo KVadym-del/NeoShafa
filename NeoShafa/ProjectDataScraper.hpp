@@ -2,6 +2,8 @@
 
 #include <expected>
 #include <functional>
+#include <string>
+#include <variant>
 
 #include <toml.hpp>
 
@@ -17,8 +19,7 @@ namespace NeoShafa {
 		inline ProjectDataScraper(
 			const ProjectEnvironment* projectEnvironment,
 			ProjectStatistics* projectStatistics
-		) noexcept : m_projectEnvironment{ projectEnvironment }, m_projectStatistics(projectStatistics) {
-		}
+		) noexcept : m_projectEnvironment{ projectEnvironment }, m_projectStatistics(projectStatistics) {}
 
 	public:
 		inline std::expected<void, Core::ProjectDataScraperErrors> project_setup()
@@ -27,7 +28,7 @@ namespace NeoShafa {
 				const auto err = Util::is_null(
 					m_projectEnvironment,
 					"Project environment is null."
-				); !err.has_value()) {
+				); !err) {
 				return std::unexpected(Core::ProjectDataScraperErrors::GenericProjectSetupError);
 			}
 
@@ -35,7 +36,7 @@ namespace NeoShafa {
 				const auto err = Util::is_null(
 					m_projectStatistics,
 					"Project statistics is null."
-				); !err.has_value()) {
+				); !err) {
 				return std::unexpected(Core::ProjectDataScraperErrors::GenericProjectSetupError);
 			}
 
@@ -67,7 +68,8 @@ namespace NeoShafa {
 
 					if (const auto it = m_projectStatistics->variablesSignatures.find(mapKey);
 						it != m_projectStatistics->variablesSignatures.end()) {
-						*it->second = data.at(key.data()).as_string();
+						*std::get<std::string*>(it->second) = data.at(key.data()).as_string();
+						// TODO: cast to other types                       .
 						return {};
 					}
 					return std::unexpected(Core::ProjectDataScraperErrors::UnexpectedParsingError);
@@ -77,24 +79,51 @@ namespace NeoShafa {
 					return std::unexpected(error);
 			};
 
+			std::function<void(std::string_view)> check_for_key = [&](
+				std::string_view arg_key
+			) {
+				const std::string_view key{ arg_key };
+				if (data.contains(key.data()) && data.at(key.data()).is_string()) {
+					const auto mapKey = Util::hash(key);
+					if (const auto it = m_projectStatistics->variablesSignatures.find(mapKey);
+						it != m_projectStatistics->variablesSignatures.end()) {
+						std::string dataStr = data.at(key.data()).as_string();
+						if (dataStr.empty()) std::println("WARNING: field of {} is empty.", key.data());
+						*std::get<std::string*>(it->second) = dataStr;
+					}
+				}
+			};
+
 			auto res = check_for_required_key(
 				"ProjectName",
 				Core::ProjectDataScraperErrors::MissingProjectName
 			);
-			if (!res.has_value()) return res;
+			if (!res) return res;
 
 			res = check_for_required_key(
 				"ProjectVersion",
 				Core::ProjectDataScraperErrors::MissingProjectVersion
 			);
-			if (!res.has_value()) return res;
+			if (!res) return res;
 
 			res = check_for_required_key(	
 				"ProjectLanguage",
 				Core::ProjectDataScraperErrors::MissingProjectLanguage
 			);
-			if (!res.has_value()) return res;
+			if (!res) return res;
+
+			res = check_for_required_key(
+				"ProjectType",
+				Core::ProjectDataScraperErrors::MissingProjectType
+			);
+			if (!res) return res;
+			if (!ProjectStatistics::is_project_type_supported(
+				m_projectStatistics->projectCompilationData.projectType)
+				)
+				return std::unexpected(Core::ProjectDataScraperErrors::UnexpectedProjectTypeError);
 			
+			check_for_key("ProjectPrebuild");
+			check_for_key("ProjectPostbuild");
 
 			return {};
 		}

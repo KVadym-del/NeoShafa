@@ -1,7 +1,9 @@
 {
   "dependencies": [
     "boost-program-options",
+    "lua",
     "ms-gsl",
-    "toml11"
+    "toml11",
+    "curl"
   ]
 }

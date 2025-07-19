@@ -28,7 +28,7 @@ namespace NeoShafa {
 			else {
 				std::filesystem::create_directory(m_projectEnvironment->projectCachePath);
 #ifdef _WIN32
-				uint32_t attrs = ::GetFileAttributesW(
+				const uint32_t attrs = ::GetFileAttributesW(
 					m_projectEnvironment->projectCachePath.wstring().c_str()
 				);
 				if (attrs == INVALID_FILE_ATTRIBUTES) {
@@ -51,6 +51,13 @@ namespace NeoShafa {
 				}
 #endif
 			}
+
+			if (std::filesystem::exists(m_projectEnvironment->projectCacheBinaryFolderPath))
+				std::println(
+					"LOG: {} folder already exists.",
+					m_projectEnvironment->projectCacheBinaryFolderPath.filename().string()
+				);
+			else std::filesystem::create_directory(m_projectEnvironment->projectCacheBinaryFolderPath);
 
 			if (std::filesystem::exists(m_projectEnvironment->projectBinaryFolderPath))
 				std::println(
@@ -98,26 +105,123 @@ namespace NeoShafa {
 				return std::unexpected(Core::ProjectConfigureErrors::DirectoryIterationError);
 			}
 
-			save_source_cache();
-
 			return {};
 
 		}
 
 		inline std::expected<void, Core::ProjectConfigureErrors> save_source_cache()
 		{
+			bool firstTime{ true };
 			for (const auto& [hash, path] : m_sourceFiles)
 			{
-				std::string content{ std::to_string(hash) + "@" + path.string() };
-				Util::write(m_projectEnvironment->projectSourceCacheFilePath, content);
+				std::string content{ std::to_string(hash) + m_sourceCacheDelimiter + path.string() };
+				if (firstTime) {
+					Util::write(m_projectEnvironment->projectSourceCacheFilePath, content);
+					firstTime = false;
+				}
+				else
+					Util::write(m_projectEnvironment->projectSourceCacheFilePath, content, true);
 			}
 
 			return {};
 		}
 
+		inline std::expected<
+			std::vector<std::pair<size_t, std::filesystem::path>>,
+			Core::ProjectConfigureErrors
+		> get_source_cache() {
+			std::vector<std::pair<size_t, std::filesystem::path>> sourceFiles{};
+			auto res = Util::read(m_projectEnvironment->projectSourceCacheFilePath);
+			if (!res.has_value()) {
+				std::println(std::cerr, "ERROR: {}", static_cast<int32_t>(res.error()));
+				return std::unexpected(Core::ProjectConfigureErrors::ReadingProjecCahedSourceError);
+			}
+			std::vector<std::string> filesContext = res.value();
+			for (auto& string : filesContext)
+			{
+				std::vector<std::string_view> filteredString = split(string);
+				sourceFiles.push_back(
+					std::make_pair(
+						std::stoll(filteredString.at(0).data()),
+						filteredString.at(1)
+					)
+				);
+			}
+
+			return sourceFiles;
+		}
+
+		inline std::expected<
+			std::vector<std::pair<size_t, std::filesystem::path>>,
+			Core::ProjectConfigureErrors
+		> get_difference_source_cache() {
+			if (!m_projectStatistics) {
+				return std::unexpected(Core::ProjectConfigureErrors::GenericProjectConfigureError);
+			}
+			auto res = get_source_cache();
+			if (!res.has_value()) {
+				return std::unexpected(Core::ProjectConfigureErrors::ReadingProjecCahedSourceError);
+			}
+			std::vector<std::pair<size_t, std::filesystem::path>> sourceFiles{ res.value() };
+			std::vector<std::pair<size_t, std::filesystem::path>> differenceFiles{};
+			for (const auto& [hash, path] : m_sourceFiles)
+			{
+				if (std::find_if(
+					sourceFiles.begin(),
+					sourceFiles.end(),
+					[&](const auto& pair) {
+						return pair.first == hash && pair.second == path;
+					}
+				) == sourceFiles.end())
+				{
+					differenceFiles.push_back(std::make_pair(hash, path));
+				}
+			}
+			return differenceFiles;
+		}
+
+		inline std::expected<void, Core::ProjectConfigureErrors> where_is_msvc()
+		{
+			auto res = Util::download_file(
+				g_projectMsvcFinderUrl,
+				m_projectEnvironment->projectMsvcFinderFilePath
+			);
+			if (!res)
+			{
+				std::println(
+					"WARNING: Cennot download file with error code({}).",
+					static_cast<int32_t>(res.error())
+				);
+			}
+
+			return {};
+		}
+
+	public:
+		std::vector<std::string_view> split(std::string& string) {
+			std::vector<std::string_view> tokens{};
+			size_t pos{};
+			std::string token{};
+			while ((pos = string.find(m_sourceCacheDelimiter)) != std::string::npos) {
+				token = string.substr(0, pos);
+				tokens.push_back(token);
+				string.erase(0, pos + (sizeof(m_sourceCacheDelimiter) / sizeof(char)));
+			}
+			tokens.push_back(string);
+
+			return tokens;
+		}
+
+	public:
+		inline const std::vector<std::pair<size_t, std::filesystem::path>>& get_source_files() const {
+			return m_sourceFiles;
+		}
+
 	private:
 		const ProjectEnvironment* m_projectEnvironment{};
 		const ProjectStatistics* m_projectStatistics{};
+
+		constexpr static const char m_sourceCacheDelimiter{ '@' };
 
 		std::vector<std::pair<size_t, std::filesystem::path>> m_sourceFiles{};
 	};

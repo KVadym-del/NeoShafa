@@ -1,5 +1,7 @@
 #pragma once  
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <print>  
 #include <string_view>  
 #include <vector>  
@@ -13,6 +15,7 @@
 #include "ProjectData.hpp"
 #include "ProjectDataScraper.hpp"
 #include "ProjectConfigure.hpp"
+#include "ProjectBuild.hpp"
 
 namespace NeoShafa {
     using namespace boost;
@@ -41,8 +44,12 @@ namespace NeoShafa {
             try {
                 auto addOptions = m_description.add_options();
                 addOptions("help,h", "Produce help message.");
-				addOptions("version,v", "Print version information and exit.");
-				addOptions("configure,c", "Configure the application.");
+                addOptions("version,v", "Print version information and exit.");
+                addOptions("configure,c", "Configure the application.");
+				addOptions("build,b", "Build the project.");
+				addOptions("full_build,B", "Build the project.");
+				addOptions("compilers", "List available compilers.");
+				addOptions("targets", "List available targets.");
 
                 program_options::store(
                     program_options::command_line_parser(m_cmdArgs)
@@ -54,6 +61,8 @@ namespace NeoShafa {
                 check_help();
                 check_version();
                 check_configure();
+                check_build();
+                check_full_build();
 
                 program_options::notify(m_variableMap);
             }
@@ -84,23 +93,67 @@ namespace NeoShafa {
             }
 		}
 
+        void check_compilers() {
+            if (m_variableMap.count("compilers")) {
+                //m_projectDataScraper.print_available_compilers();
+                exit(0);
+            }
+		}
+
+        void scrape_data()
+        {
+            if (const auto res = m_projectDataScraper.project_setup();
+                !res
+                )
+                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+        }
+        void configure()
+        {
+            scrape_data();
+            if (const auto res = m_projectConfigure.setup_project_folders();
+                !res
+                )
+                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+
+            if (const auto res = m_projectConfigure.get_all_source_files();
+                !res
+                )
+                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+            m_projectConfigure.save_source_cache();
+
+#ifdef _WIN32
+            if (const auto res = m_projectConfigure.where_is_msvc();
+                !res
+                )
+                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+#endif
+        }
+
         void check_configure() {
-            if (m_variableMap.count("configure")) {
-                if (const auto err = m_projectDataScraper.project_setup();
-                    !err.has_value()
-                    )
-                    std::println("ERROR: {}", static_cast<int32_t>(err.error()));
+            if (m_variableMap.count("configure"))
+                configure();
+        }
 
-                m_projectConfigure = { &m_projectEnvironment, &m_projectStatistics };
-                if (const auto err = m_projectConfigure.setup_project_folders();
-                    !err.has_value()
+        void check_build()
+        {
+            if (m_variableMap.count("build"))
+            {
+                scrape_data();
+                if (const auto res = m_projectBuild.full_build();
+                    !res
                     )
-                    std::println("ERROR: {}", static_cast<int32_t>(err.error()));
+                    std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+            }
+        }
 
-                if (const auto err = m_projectConfigure.get_all_source_files();
-                    !err.has_value()
+        void check_full_build() {
+            if (m_variableMap.count("full_build"))
+            {
+                configure();
+                if (const auto res = m_projectBuild.full_build();
+                    !res
                     )
-                    std::println("ERROR: {}", static_cast<int32_t>(err.error()));
+                    std::println("ERROR: {}", static_cast<int32_t>(res.error()));
             }
         }
 
@@ -113,7 +166,8 @@ namespace NeoShafa {
         ProjectEnvironment m_projectEnvironment{};
         ProjectStatistics m_projectStatistics{};
 
-        ProjectDataScraper m_projectDataScraper{};
-        ProjectConfigure m_projectConfigure{};
+        ProjectDataScraper m_projectDataScraper{ &m_projectEnvironment, &m_projectStatistics };
+        ProjectConfigure m_projectConfigure{ &m_projectEnvironment, &m_projectStatistics };
+        ProjectBuild m_projectBuild{ &m_projectEnvironment, &m_projectStatistics };
     };
 }
