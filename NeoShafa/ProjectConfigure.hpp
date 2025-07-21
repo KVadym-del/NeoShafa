@@ -4,14 +4,10 @@
 #include <windows.h>
 #endif
 
-#include <boost/process.hpp>
-
 #include "Util.hpp"
 #include "ProjectData.hpp"
 
 namespace NeoShafa {
-	namespace BoostProcess = boost::process;
-
 	class ProjectConfigure {
 	public:
 		ProjectConfigure() = default;
@@ -146,10 +142,11 @@ namespace NeoShafa {
 				std::vector<std::string_view> filteredString = split(string);
 				sourceFiles.push_back(
 					std::make_pair(
-						std::stoll(filteredString.at(0).data()),
+						std::stoull(filteredString.at(0).data()),
 						filteredString.at(1)
 					)
 				);
+
 			}
 
 			return sourceFiles;
@@ -184,55 +181,6 @@ namespace NeoShafa {
 			return differenceFiles;
 		}
 
-		inline std::expected<std::string, Core::ProjectConfigureErrors> run_command(
-			const std::filesystem::path& executable,
-			const std::vector<std::string>& args
-		) {
-			if (!std::filesystem::exists(executable)) {
-				std::println(
-					std::cerr,
-					"ERROR: Executable not found at {}",\
-					executable.string()
-				);
-				return "";
-			}
-
-			BoostProcess::ipstream pipeStream{};
-			std::string out{};
-			try {
-				BoostProcess::child child{
-					executable.string(),
-					args,
-					BoostProcess::std_out > pipeStream
-				};
-
-				std::stringstream sstream{};
-				sstream << pipeStream.rdbuf();
-				out = sstream.str();
-
-				child.wait();
-				if (child.exit_code() != 0) {
-					std::println(
-						std::cerr,
-						"ERROR: {} exited with an error code: {}",
-						g_projectMsvcFinderFileName,
-						child.exit_code()
-					);
-				}
-			}
-			catch (const boost::process::process_error& error) {
-				std::println(
-					std::cerr,
-					"ERROR: Error executing vswhere.exe. Is it installed at the specified path?\n\t{}",
-					error.what()
-				);
-			}
-			if (!out.empty()) {
-				out.erase(out.find_last_not_of("\r\n") + 1);
-			}
-			return out;
-		}
-
 		inline std::expected<void, Core::ProjectConfigureErrors> where_is_cl()
 		{
 			if (!std::filesystem::exists(m_projectEnvironment->projectMsvcFinderFilePath))
@@ -256,7 +204,7 @@ namespace NeoShafa {
 				"-property", "installationPath"
 			};
 
-			auto res = run_command(
+			auto res = Util::run_command(
 				m_projectEnvironment->projectMsvcFinderFilePath.string(),
 				vswhereArgs
 			);
@@ -333,16 +281,19 @@ namespace NeoShafa {
 		}
 
 	public:
-		std::vector<std::string_view> split(std::string& string) {
+		std::vector<std::string_view> split(const std::string& string) const {
 			std::vector<std::string_view> tokens{};
-			size_t pos{};
-			std::string token{};
-			while ((pos = string.find(m_sourceCacheDelimiter)) != std::string::npos) {
-				token = string.substr(0, pos);
-				tokens.push_back(token);
-				string.erase(0, pos + (sizeof(m_sourceCacheDelimiter) / sizeof(char)));
+			size_t start = 0;
+			size_t end = 0;
+
+			while ((end = string.find(m_sourceCacheDelimiter, start)) != std::string::npos) {
+				tokens.emplace_back(string.data() + start, end - start);
+				start = end + 1;
 			}
-			tokens.push_back(string);
+
+			if (start < string.length()) {
+				tokens.emplace_back(string.data() + start, string.length() - start);
+			}
 
 			return tokens;
 		}

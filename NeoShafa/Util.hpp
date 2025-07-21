@@ -10,11 +10,17 @@
 
 #include <curl/curl.h>
 
+#include <boost/process.hpp>
+
 #include "Core.hpp"
 #include <cstdio>
+#include <iostream>
 
 namespace NeoShafa::Util {
     using namespace Core;
+
+    namespace BoostProcess = boost::process;
+
     template <typename T>
     static inline std::expected<void, BasicErrors> is_null(const T* pointer, std::string_view errorMessage = "") noexcept
     {
@@ -123,4 +129,53 @@ namespace NeoShafa::Util {
 
         return {};
     }
+
+    inline static std::expected<std::string, Core::ProjectConfigureErrors> run_command(
+        const std::filesystem::path& executable,
+        const std::vector<std::string>& args
+    ) {
+        if (!std::filesystem::exists(executable)) {
+            std::println(
+                std::cerr,
+                "ERROR: Executable not found at {}", \
+                executable.string()
+            );
+            return "";
+        }
+
+        BoostProcess::ipstream pipeStream{};
+        std::string out{};
+        try {
+            BoostProcess::child child{
+                executable.string(),
+                args,
+                BoostProcess::std_out > pipeStream
+            };
+
+            std::stringstream sstream{};
+            sstream << pipeStream.rdbuf();
+            out = sstream.str();
+
+            child.wait();
+            if (child.exit_code() != 0) {
+                std::println(
+                    std::cerr,
+                    "ERROR: exited with an error code: {}",
+                    child.exit_code()
+                );
+            }
+        }
+        catch (const boost::process::process_error& error) {
+            std::println(
+                std::cerr,
+                "ERROR: Error executing vswhere.exe. Is it installed at the specified path?\n\t{}",
+                error.what()
+            );
+        }
+        if (!out.empty()) {
+            out.erase(out.find_last_not_of("\r\n") + 1);
+        }
+        return out;
+    }
+
 }

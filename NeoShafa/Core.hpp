@@ -42,6 +42,8 @@ namespace NeoShafa::Core {
         MissingProjectVersion,
         MissingProjectLanguage,
         MissingProjectType,
+        MissingProjectCVersion,
+        MissingProjectCppVersion,
 
         UnexpectedProjectTypeError,
     };

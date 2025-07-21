@@ -62,11 +62,23 @@ namespace NeoShafa {
 
 	struct ProjectCompilationData {
 		std::string projectType{};
-		static constexpr std::array<std::string_view, 3> supportedProjectTypes{
-			"Executable",
-			"StaticLibrary",
-			"DynamicLibrary"
+		struct SupportedProjectTypes {
+			static constexpr std::array<std::string_view, 3> supportedProjectTypes{
+				"Executable",
+				"StaticLibrary",
+				"DynamicLibrary"
+			};
+			enum supportedProjectTypesEnum {
+				Executable,
+				StaticLibrary,
+				DynamicLibrary
+			};
+
+			constexpr const auto& operator*() const {
+				return supportedProjectTypes;
+			}
 		};
+		static constexpr SupportedProjectTypes supportedProjectTypes;
 
 #ifdef _WIN32
 		Core::SupportedCompilers projectCompilers{ Core::SupportedCompilers::MSVC };
@@ -79,11 +91,11 @@ namespace NeoShafa {
 		Core::SupportedTargets projectTargets{ Core::SupportedTargets::Unknown };
 #endif
 
-		std::string cCompilerVersion{};
+		std::string cCompilerVersion{"c99"};
 		std::string cCompilerFlags{};
 		std::string cCompilerPath{};
 
-		std::string cppCompilerVersion{};
+		std::string cppCompilerVersion{"c++17"};
 		std::string cppCompilerFlags{};
 		std::string cppCompilerPath{};
 	};
@@ -155,12 +167,8 @@ namespace NeoShafa {
 
 		}
 
-		static inline bool is_project_type_supported(std::string_view projectType) {
-			return std::find(
-				ProjectCompilationData::supportedProjectTypes.begin(),
-				ProjectCompilationData::supportedProjectTypes.end(),
-				projectType
-			) != ProjectCompilationData::supportedProjectTypes.end();
+		constexpr static inline bool is_project_type_supported(std::string_view projectType) {
+			return std::ranges::find(*ProjectCompilationData::supportedProjectTypes, projectType) != (*ProjectCompilationData::supportedProjectTypes).end();
 		}
 
 		// ----------------Required Project Information----------------

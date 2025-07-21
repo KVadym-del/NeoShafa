@@ -62,6 +62,8 @@ namespace NeoShafa {
                 check_help();
                 check_version();
                 check_configure();
+
+                // TODO: without config there is no sourcecache, so there is memory error.
                 check_build();
                 check_full_build();
 
@@ -140,10 +142,17 @@ namespace NeoShafa {
             if (m_variableMap.count("build"))
             {
                 scrape_data();
-                if (const auto res = m_projectBuild.full_build();
-                    !res
+                std::vector<std::filesystem::path> diffSource{};
+                auto res = m_projectConfigure.get_difference_source_cache();
+                if (!res) std::println(std::cerr, "ERROR: code({})", static_cast<int32_t>(res.error()));
+                
+                if (res->empty()) return;   
+                for (const auto& [_, path] : *res)
+                    diffSource.push_back(path);
+                if (const auto resScope = m_projectBuild.full_build(diffSource);
+                    !resScope
                     )
-                    std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+                    std::println("ERROR: {}", static_cast<int32_t>(resScope.error()));
             }
         }
 
@@ -151,10 +160,17 @@ namespace NeoShafa {
             if (m_variableMap.count("full_build"))
             {
                 configure();
-                if (const auto res = m_projectBuild.full_build();
-                    !res
+                std::vector<std::filesystem::path> diffSource{};
+                auto res = m_projectConfigure.get_source_cache();
+                if (!res) std::println(std::cerr, "ERROR: code({})", static_cast<int32_t>(res.error()));
+
+                if (res->empty()) return;
+                for (const auto& [_, path] : *res)
+                    diffSource.push_back(path);
+                if (const auto resScope = m_projectBuild.full_build(diffSource);
+                    !resScope
                     )
-                    std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+                    std::println("ERROR: {}", static_cast<int32_t>(resScope.error()));
             }
         }
 

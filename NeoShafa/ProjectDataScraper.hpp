@@ -125,6 +125,9 @@ namespace NeoShafa {
 			check_for_key("ProjectPrebuild");
 			check_for_key("ProjectPostbuild");
 
+			check_for_key("cCompilerVersion");
+			check_for_key("cppCompilerVersion");
+
 			return {};
 		}
 
