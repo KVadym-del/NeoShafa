@@ -75,7 +75,7 @@ namespace NeoShafa {
 				return std::unexpected(Core::ProjectConfigureErrors::InvalidEnvironmentError);
 			}
 
-			const std::vector<std::string> sourceExtensions { ".cpp", ".cxx", ".inl" };
+			const std::array<std::string, 3> sourceExtensions { ".cpp", ".cxx", ".inl" };
 
 			try
 			{
@@ -114,7 +114,7 @@ namespace NeoShafa {
 			bool firstTime{ true };
 			for (const auto& [hash, path] : m_sourceFiles)
 			{
-				std::string content{ std::to_string(hash) + m_sourceCacheDelimiter + path.string() };
+				std::string content{ std::to_string(hash) + m_sourceCacheDelimiter + path.string() + "\n"};
 				if (firstTime) {
 					Util::write(m_projectEnvironment->projectSourceCacheFilePath, content);
 					firstTime = false;
@@ -123,6 +123,10 @@ namespace NeoShafa {
 					Util::write(m_projectEnvironment->projectSourceCacheFilePath, content, true);
 			}
 
+			return {};
+		}
+		inline std::expected<void, Core::ProjectConfigureErrors> create_source_cache() {
+			Util::write(m_projectEnvironment->projectSourceCacheFilePath, "");
 			return {};
 		}
 
@@ -180,6 +184,8 @@ namespace NeoShafa {
 			}
 			return differenceFiles;
 		}
+
+
 
 		inline std::expected<void, Core::ProjectConfigureErrors> where_is_cl()
 		{

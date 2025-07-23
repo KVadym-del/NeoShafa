@@ -69,7 +69,7 @@ namespace NeoShafa::Util {
         if (!file)
             return std::unexpected(Core::BasicErrors::CannotWriteFileError);
 
-        file << content << "\n";
+        file << content;
 
         return {};
     }

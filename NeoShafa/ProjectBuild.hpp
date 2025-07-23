@@ -24,7 +24,7 @@ namespace NeoShafa {
 			if (!m_projectStatistics->projectPrebuild.empty())
 				prebuild();
 
-			const auto res = build(diffSource);
+			const auto res = build_to_object(diffSource);
 			if (!res) return res;
 
 			if(!m_projectStatistics->projectPostbuild.empty())
@@ -33,14 +33,15 @@ namespace NeoShafa {
 			return {};
 		}
 
-		inline std::expected<void, Core::ProjectBuildErrors> build(
+		inline std::expected<void , Core::ProjectBuildErrors > build_to_object(
 			const std::vector<std::filesystem::path>& diffSource
 		) {	
 			std::vector<std::string> msvcCompileString {
 				std::format("/nologo"),
+				std::format("/c"),
 				std::format("/Fo:{}", m_projectEnvironment->projectBinaryFolderPath.string().append("\\")),
 				std::format("/Fd:{}", m_projectEnvironment->projectBinaryFolderPath.string().append("\\")),
-				std::format("/Fe:{}", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string())
+				//std::format("/Fe:{}", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string())
 			};
 			std::string otherCompileString{};
 
