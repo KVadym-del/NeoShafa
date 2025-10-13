@@ -274,7 +274,7 @@ namespace NeoShafa {
 			}
 			boost::trim(msvcVersion);
 
-			std::filesystem::path cl_path{ 
+			std::filesystem::path msvc_tools_path{ 
 				installDir /
 				"VC" /
 				"Tools" /
@@ -282,9 +282,11 @@ namespace NeoShafa {
 				msvcVersion /
 				"bin" /
 				hostArch /
-				targetArch / 
-				"cl.exe" 
+				targetArch
 			};
+			std::filesystem::path cl_path{ msvc_tools_path / "cl.exe" };
+			std::filesystem::path lib_path{ msvc_tools_path / "lib.exe" };
+			std::filesystem::path link_path{ msvc_tools_path / "link.exe" };
 			
 			if (!std::filesystem::exists(cl_path)) {
 				return std::unexpected(
@@ -293,14 +295,35 @@ namespace NeoShafa {
 					)
 				);
 			}
+			else if (!std::filesystem::exists(lib_path))
+			{
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::InvalidLibPathError, std::format("Could not find lib.exe at path: {}.", lib_path.string())
+					)
+				);
+			}
+			else if (!std::filesystem::exists(link_path))
+			{
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::InvalidLinkPathError, std::format("Could not find link.exe at path: {}.", link_path.string())
+					)
+				);
+			}
 
 			m_projectStatistics->projectCompilationData.cCompilerPath = cl_path.string();
 			m_projectStatistics->projectCompilationData.cppCompilerPath = cl_path.string();
+			m_projectStatistics->projectCompilationData.projectLibPath = lib_path.string();	
+			m_projectStatistics->projectCompilationData.projectLinkerPath = link_path.string();	
 			
 
-			std::println("INFO: Compiler paths set to: cCompilerPath = {}, cppCompilerPath = {}",
+			std::println("INFO: Compiler paths set to: \ncCompilerPath = {}, \ncppCompilerPath = {} \nprojectLibPath = {}, \nprojectLinkerPath = {}",
 				m_projectStatistics->projectCompilationData.cCompilerPath,
-				m_projectStatistics->projectCompilationData.cppCompilerPath);
+				m_projectStatistics->projectCompilationData.cppCompilerPath,
+				m_projectStatistics->projectCompilationData.projectLibPath,
+				m_projectStatistics->projectCompilationData.projectLinkerPath
+			);
 
 			return {};
 		}

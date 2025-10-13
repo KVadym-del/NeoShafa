@@ -98,6 +98,12 @@ namespace NeoShafa {
 		std::string cppCompilerVersion{"c++17"};
 		std::string cppCompilerFlags{};
 		std::string cppCompilerPath{};
+
+		std::string projectLibFlags{};
+		std::string projectLibPath{};
+
+		std::string projectLinkerFlags{};
+		std::string projectLinkerPath{};
 	};
 
 	struct ProjectStatistics {

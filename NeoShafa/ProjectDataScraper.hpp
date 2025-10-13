@@ -43,7 +43,12 @@ namespace NeoShafa {
 			const std::filesystem::path projectConfigFilePath = m_projectEnvironment->projectRoot / g_projectConfigureFileName;
 
 			if (!std::filesystem::exists(projectConfigFilePath))
-				return std::unexpected(Core::make_error(Core::ErrorCode::ProjectConfigFileNotExist, "Cannot finde project configuration fiile."));
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::ProjectConfigFileNotExist,
+						"Cannot finde project configuration fiile."
+					)
+				);
 
 
 			auto tryData = toml::try_parse(
@@ -72,7 +77,12 @@ namespace NeoShafa {
 						// TODO: cast to other types                       .
 						return {};
 					}
-					return std::unexpected(Core::make_error(Core::ErrorCode::UnexpectedParsingError, std::format("Cannot parse {}.", key.data())));
+					return std::unexpected(
+						Core::make_error(
+							Core::ErrorCode::UnexpectedParsingError,
+							std::format("Cannot parse {}.", key.data())
+						)
+					);
 
 				}
 				else

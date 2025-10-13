@@ -113,6 +113,8 @@ namespace NeoShafa::Core {
         InvalidInstallationDirectoryError,
         InvalidMsvcVersionError,
         InvalidClPathError,
+        InvalidLibPathError,
+        InvalidLinkPathError,
 
         GenericBuildError = 300,
 
