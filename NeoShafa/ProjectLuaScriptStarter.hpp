@@ -18,34 +18,20 @@ namespace NeoShafa {
 		ProjectLuaScriptStarter() = delete;
 		~ProjectLuaScriptStarter() = delete;
 
-		inline static std::expected<void, Core::LuaError> run(const std::filesystem::path& scriptPath) {
+		inline static Core::ExpectedVoid run(const std::filesystem::path& scriptPath) {
 			int32_t status{};
 			lua_State* m_luaState = luaL_newstate();
 			luaL_openlibs(m_luaState);
 
-			if (scriptPath.empty()) {
-				std::println(std::cerr, "ERROR: No script path provided!");
-				return std::unexpected(Core::LuaError::CannotReadFileError);
-			}
+			if (scriptPath.empty())
+				return std::unexpected(Core::make_error(Core::ErrorCode::CannotReadFileError, "No script path provided!"));
 
-			if (!std::filesystem::exists(scriptPath)) {
-				std::println(
-					std::cerr,
-					"ERROR: Script file does not exist: {}",
-					scriptPath.string()
-				);
-				return std::unexpected(Core::LuaError::FileNotFoundError);
-			}
+			if (!std::filesystem::exists(scriptPath))
+				return std::unexpected(Core::make_error(Core::ErrorCode::FileNotFoundError, std::format("Script file does not exist: {}", scriptPath.string())));
 
 			status = luaL_dofile(m_luaState, scriptPath.string().c_str());
-			if (status) {
-				std::println(
-					std::cerr,
-					"ERROR: Lua error: {}",
-					lua_tostring(m_luaState, -1)
-				);
-				return std::unexpected(Core::LuaError::ExecutionError);
-			}
+			if (status)
+				return std::unexpected(Core::make_error(Core::ErrorCode::ExecutionError, std::format("Lua error: {}", lua_tostring(m_luaState, -1))));
 
 			return {};
 		}

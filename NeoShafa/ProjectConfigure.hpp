@@ -18,7 +18,7 @@ namespace NeoShafa {
 			ProjectStatistics* projectStatistics
 		) noexcept : m_projectEnvironment(projectEnvironment), m_projectStatistics(projectStatistics) {}
 
-		inline std::expected<void, Core::ProjectConfigureErrors> setup_project_folders()
+		inline Core::ExpectedVoid setup_project_folders()
 		{
 			if (std::filesystem::exists(m_projectEnvironment->projectCachePath))
 				std::println(
@@ -32,22 +32,24 @@ namespace NeoShafa {
 					m_projectEnvironment->projectCachePath.wstring().c_str()
 				);
 				if (attrs == INVALID_FILE_ATTRIBUTES) {
-					std::println(
-						std::cerr,
-						"ERROR: GetFileAttributes failed {} ",
-						GetLastError());
-					return std::unexpected(Core::ProjectConfigureErrors::GetFileAttributesError);
+					return std::unexpected(
+						Core::make_error(
+							Core::ErrorCode::GetFileAttributesError,
+							std::format("GetFileAttributes failed {}", GetLastError())
+						)
+					);
 				}
 				if (!::SetFileAttributesW(
 					m_projectEnvironment->projectCachePath.wstring().c_str(),
 					attrs | FILE_ATTRIBUTE_HIDDEN)
 					)
 				{
-					std::println(
-						std::cerr, 
-						"ERROR: SetFileAttributes failed {}",GetLastError()
+					return std::unexpected(
+						Core::make_error(
+							Core::ErrorCode::SetFileAttributesError,
+							std::format("SetFileAttributes failed {}", GetLastError())
+						)
 					);
-					return std::unexpected(Core::ProjectConfigureErrors::SetFileAttributesError);
 				}
 #endif
 			}
@@ -69,10 +71,13 @@ namespace NeoShafa {
 			return {};
 		}
 
-		inline std::expected<void, Core::ProjectConfigureErrors> get_all_source_files()
+		inline Core::ExpectedVoid get_all_source_files()
 		{
 			if (!m_projectEnvironment) {
-				return std::unexpected(Core::ProjectConfigureErrors::InvalidEnvironmentError);
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::InvalidEnvironmentError, "Environment iis not valid.")
+				);
 			}
 
 			const std::array<std::string, 3> sourceExtensions { ".cpp", ".cxx", ".inl" };
@@ -88,7 +93,11 @@ namespace NeoShafa {
 						{
 							 auto res = Util::hash(entry.path());
 							 if (!res.has_value())
-								 return std::unexpected(Core::ProjectConfigureErrors::GeneratinFileHashError);
+								 return std::unexpected(
+									 Core::make_error(
+										 Core::ErrorCode::GeneratinFileHashError,
+										 "Cannot generate hash.")
+								 );
 							 size_t fileHash = res.value();
 							m_sourceFiles.push_back(std::make_pair(fileHash, entry.path()));
 						}
@@ -97,19 +106,19 @@ namespace NeoShafa {
 			}
 			catch (const std::filesystem::filesystem_error& e)
 			{
-				std::println(
-					std::cerr,
-					"ERROR: Failed to iterate through source files: {}",
-					e.what()
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::DirectoryIterationError,
+						std::format("Failed to iterate through source files: {}", e.what())
+					)
 				);
-				return std::unexpected(Core::ProjectConfigureErrors::DirectoryIterationError);
 			}
 
 			return {};
 
 		}
 
-		inline std::expected<void, Core::ProjectConfigureErrors> save_source_cache()
+		inline Core::ExpectedVoid save_source_cache()
 		{
 			bool firstTime{ true };
 			for (const auto& [hash, path] : m_sourceFiles)
@@ -125,20 +134,21 @@ namespace NeoShafa {
 
 			return {};
 		}
-		inline std::expected<void, Core::ProjectConfigureErrors> create_source_cache() {
+		inline Core::ExpectedVoid create_source_cache() {
 			Util::write(m_projectEnvironment->projectSourceCacheFilePath, "");
 			return {};
 		}
 
-		inline std::expected<
-			std::vector<std::pair<size_t, std::filesystem::path>>,
-			Core::ProjectConfigureErrors
-		> get_source_cache() {
+		inline Core::Expected<std::vector<std::pair<size_t, std::filesystem::path>>> get_source_cache() {
 			std::vector<std::pair<size_t, std::filesystem::path>> sourceFiles{};
 			auto res = Util::read(m_projectEnvironment->projectSourceCacheFilePath);
-			if (!res.has_value()) {
-				std::println(std::cerr, "ERROR: {}", static_cast<int32_t>(res.error()));
-				return std::unexpected(Core::ProjectConfigureErrors::ReadingProjecCahedSourceError);
+			if (!res) {
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::ReadingProjectCahedSourceError,
+						std::format("Reading project cahed source error: {}({})", res.error().message, static_cast<int32_t>(res.error().code))
+					)
+				);
 			}
 			std::vector<std::string> filesContext = res.value();
 			for (auto& string : filesContext)
@@ -156,16 +166,21 @@ namespace NeoShafa {
 			return sourceFiles;
 		}
 
-		inline std::expected<
-			std::vector<std::pair<size_t, std::filesystem::path>>,
-			Core::ProjectConfigureErrors
-		> get_difference_source_cache() {
+		inline Core::Expected<std::vector<std::pair<size_t, std::filesystem::path>>> get_difference_source_cache() {
 			if (!m_projectStatistics) {
-				return std::unexpected(Core::ProjectConfigureErrors::GenericProjectConfigureError);
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::GenericProjectConfigureError, "Project statistics is not valid."
+					)
+				);
 			}
 			auto res = get_source_cache();
 			if (!res.has_value()) {
-				return std::unexpected(Core::ProjectConfigureErrors::ReadingProjecCahedSourceError);
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::ReadingProjectCahedSourceError, "Reading project cahed source error."
+					)
+				);
 			}
 			std::vector<std::pair<size_t, std::filesystem::path>> sourceFiles{ res.value() };
 			std::vector<std::pair<size_t, std::filesystem::path>> differenceFiles{};
@@ -187,7 +202,7 @@ namespace NeoShafa {
 
 
 
-		inline std::expected<void, Core::ProjectConfigureErrors> where_is_cl()
+		inline Core::ExpectedVoid where_is_cl()
 		{
 			if (!std::filesystem::exists(m_projectEnvironment->projectMsvcFinderFilePath))
 			{
@@ -198,8 +213,9 @@ namespace NeoShafa {
 				if (!res)
 				{
 					std::println(
-						"WARNING: Cannot download file with error code({}).",
-						static_cast<int32_t>(res.error())
+						"WARNING: Cannot download file with error: {}({}).",
+						res.error().message,
+						static_cast<int32_t>(res.error().code)
 					);
 				}
 			}
@@ -210,9 +226,11 @@ namespace NeoShafa {
 				"-property", "installationPath"
 			};
 
+			int32_t exitCode{};
 			auto res = Util::run_command(
 				m_projectEnvironment->projectMsvcFinderFilePath.string(),
-				vswhereArgs
+				vswhereArgs,
+				exitCode
 			);
 			if (!res) return std::unexpected(res.error());
 			
@@ -220,10 +238,11 @@ namespace NeoShafa {
 
 
 			if (installDir.empty()) {
-				std::println(
-					"ERROR: Could not find Visual Studio installation directory. Please ensure Visual Studio is installed and the required components are present."
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::InvalidInstallationDirectoryError, "Could not find Visual Studio installation directory. Please ensure Visual Studio is installed and the required components are present."
+					)
 				);
-				return std::unexpected(Core::ProjectConfigureErrors::InvalidInstallationDirectoryError);
 			}
 
 			const std::string hostArch{ "HostX64" };
@@ -238,20 +257,20 @@ namespace NeoShafa {
 			};
 			auto resFile = Util::read(version_file);
 			if (!resFile) {
-				std::println(
-					"ERROR: Could not read MSVC version file at: {}",
-					version_file.string()
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::InvalidMsvcVersionError, std::format("Could not read MSVC version file at: {}.", version_file.string())
+					)
 				);
-				return std::unexpected(Core::ProjectConfigureErrors::InvalidMsvcVersionError);
 			}
 
 			std::string msvcVersion = resFile.value().front();
 			if (msvcVersion.empty()) {
-				std::println(
-					"ERROR: Could not read MSVC version file at: {}",
-					version_file.string()
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::InvalidMsvcVersionError, std::format("MSVC version is empty in file: {}.", version_file.string())
+					)
 				);
-				return std::unexpected(Core::ProjectConfigureErrors::InvalidMsvcVersionError);
 			}
 			boost::trim(msvcVersion);
 
@@ -268,11 +287,11 @@ namespace NeoShafa {
 			};
 			
 			if (!std::filesystem::exists(cl_path)) {
-				std::println(
-					"ERROR: Could not find cl.exe at the expected path: {}",
-					cl_path.string()
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::InvalidClPathError, std::format("Could not find cl.exe at path: {}.", cl_path.string())
+					)
 				);
-				return std::unexpected(Core::ProjectConfigureErrors::InvalidClPathError);
 			}
 
 			m_projectStatistics->projectCompilationData.cCompilerPath = cl_path.string();

@@ -24,8 +24,8 @@ namespace NeoShafa {
         inline explicit Router(int32_t argc, char** argv) {
             auto result = Util::is_null(argv);
             if (!result) {
-                auto errorValue = static_cast<int32_t>(result.error());
-                std::println(std::cerr, "ERROR: {}", errorValue);
+                auto errorValue = static_cast<int32_t>(result.error().code);
+                std::println(std::cerr, "ERROR: {}({})", result.error().message, errorValue);
 
                 exit(errorValue);
             }
@@ -41,7 +41,7 @@ namespace NeoShafa {
             m_projectDataScraper = { &m_projectEnvironment, &m_projectStatistics };
         }
 
-        std::expected <void, Core::RouterErrors> run() {
+        Core::ExpectedVoid run() {
             try {
                 auto addOptions = m_description.add_options();
                 addOptions("help,h", "Produce help message.");
@@ -71,8 +71,11 @@ namespace NeoShafa {
             }
             catch (const program_options::error& exception) {
                 // TODO: Add more errors to the enum, for now just print error.
-                std::println(std::cerr, "TEMP(ERROR): {}", exception.what());
-                return std::unexpected(Core::RouterErrors::GenericError);
+                return std::unexpected(
+                    Core::make_error(
+                        Core::ErrorCode::GenericError, std::format("(Temp): {}", exception.what())
+                    )
+                );
             }
             return {};
         }
@@ -105,29 +108,21 @@ namespace NeoShafa {
 
         void scrape_data()
         {
-            if (const auto res = m_projectDataScraper.project_setup();
-                !res
-                )
-                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+            if (const auto res = m_projectDataScraper.project_setup(); !res)
+                std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
         }
         void configure()
         {
             scrape_data();
-            if (const auto res = m_projectConfigure.setup_project_folders();
-                !res
-                )
-                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+            if (const auto res = m_projectConfigure.setup_project_folders(); !res)
+                std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
 
-            if (const auto res = m_projectConfigure.get_all_source_files();
-                !res
-                )
-                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+            if (const auto res = m_projectConfigure.get_all_source_files(); !res)
+                std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
             m_projectConfigure.create_source_cache();
 #ifdef _WIN32
-            if (const auto res = m_projectConfigure.where_is_cl();
-                !res
-                )
-                std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+            if (const auto res = m_projectConfigure.where_is_cl(); !res)
+                std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
 #endif
         }
 
@@ -141,20 +136,16 @@ namespace NeoShafa {
             if (m_variableMap.count("build"))
             {
                 scrape_data();
-                if (const auto res = m_projectConfigure.get_all_source_files();
-                    !res
-                    )
-                    std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+                if (const auto res = m_projectConfigure.get_all_source_files(); !res)
+                    std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
 #ifdef _WIN32
-                if (const auto res = m_projectConfigure.where_is_cl();
-                    !res
-                    )
-                    std::println("ERROR: {}", static_cast<int32_t>(res.error()));
+                if (const auto res = m_projectConfigure.where_is_cl(); !res)
+                    std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
 #endif
 
                 std::vector<std::filesystem::path> diffSource{};
                 auto res = m_projectConfigure.get_difference_source_cache();
-                if (!res) std::println(std::cerr, "ERROR: code({})", static_cast<int32_t>(res.error()));
+                if (!res) std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
                 
                 if (res->empty()) {
                     std::println("INFO: No source files to compile, skipping compilation step.");
@@ -162,11 +153,10 @@ namespace NeoShafa {
                 };
                 for (const auto& [_, path] : *res)
                     diffSource.push_back(path);
-                if (const auto resScope = m_projectBuild.full_build(diffSource);
-                    !resScope
-                    )
-                    std::println("ERROR: {}", static_cast<int32_t>(resScope.error()));
-                m_projectConfigure.save_source_cache(); // TODO: Do not save if an error.
+                if (const auto resScope = m_projectBuild.full_build(diffSource); !resScope)
+                    std::println("ERROR: {}({})", resScope.error().message, static_cast<int32_t>(resScope.error().code));
+                else
+                    m_projectConfigure.save_source_cache(); // TODO: Do not save if an error.
             }
         }
 
@@ -176,15 +166,13 @@ namespace NeoShafa {
                 configure();
                 std::vector<std::filesystem::path> diffSource{};
                 auto res = m_projectConfigure.get_difference_source_cache();
-                if (!res) std::println(std::cerr, "ERROR: code({})", static_cast<int32_t>(res.error()));
+                if (!res) std::println("ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
 
                 if (res->empty()) return;
                 for (const auto& [_, path] : *res)
                     diffSource.push_back(path);
-                if (const auto resScope = m_projectBuild.full_build(diffSource);
-                    !resScope
-                    )
-                    std::println("ERROR: {}", static_cast<int32_t>(resScope.error()));
+                if (const auto resScope = m_projectBuild.full_build(diffSource); !resScope)
+                    std::println("ERROR: {}({})", resScope.error().message, static_cast<int32_t>(resScope.error().code));
                 m_projectConfigure.save_source_cache();
             }
         }

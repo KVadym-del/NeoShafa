@@ -6,6 +6,7 @@
 #include <filesystem>  
 #include <string_view>  
 #include <print>  
+#include <format>  
 #include <fstream>  
 
 #include <curl/curl.h>
@@ -22,16 +23,15 @@ namespace NeoShafa::Util {
     namespace BoostProcess = boost::process;
 
     template <typename T>
-    static inline std::expected<void, BasicErrors> is_null(const T* pointer, std::string_view errorMessage = "") noexcept
+    static inline ExpectedVoid is_null(const T* pointer, std::string_view errorMessage = "")
     {
         if (pointer == nullptr) {
             if (!errorMessage.empty())
-                std::println(
-                    "ERROR(Custom): {}({})", 
-                    errorMessage, 
-                    static_cast<int32_t>(BasicErrors::PointerIsNull)
-                );
-            return std::unexpected(BasicErrors::PointerIsNull);
+            return std::unexpected(make_error(ErrorCode::PointerIsNull, std::format(
+                "{}({})",
+                errorMessage,
+                static_cast<int32_t>(ErrorCode::PointerIsNull)
+            )));
         }
         else
             return {};
@@ -41,10 +41,10 @@ namespace NeoShafa::Util {
         return std::hash<std::string>{}(string.data());
     }
 
-    static inline  std::expected<size_t, BasicErrors> hash(const std::filesystem::path& path) {
+    static inline Expected<size_t> hash(const std::filesystem::path& path) {
         std::ifstream file{ path, std::ios::binary };
         if (!file)
-            return std::unexpected(Core::BasicErrors::CannotReadFileError);
+            return std::unexpected(make_error(ErrorCode::CannotReadFileError, std::format("Cannot open file {} to create hash.", path.string())));
 
         std::string contents{
             std::istreambuf_iterator<char>(file),
@@ -55,7 +55,7 @@ namespace NeoShafa::Util {
         return hasher(std::string_view{ contents });
     }
 
-    static inline std::expected<void, BasicErrors> write(
+    static inline ExpectedVoid write(
         const std::filesystem::path& path,
         std::string_view content,
 		bool append = false
@@ -67,18 +67,18 @@ namespace NeoShafa::Util {
         
         std::ofstream file{ path, mode };
         if (!file)
-            return std::unexpected(Core::BasicErrors::CannotWriteFileError);
+            return std::unexpected(make_error(ErrorCode::CannotWriteFileError, ""));
 
         file << content;
 
         return {};
     }
 
-    static inline std::expected<std::vector<std::string>, BasicErrors> read(const std::filesystem::path& path)
+    static inline Expected<std::vector<std::string>> read(const std::filesystem::path& path)
     {
         std::ifstream file{ path };
         if (!file)
-            return std::unexpected(Core::BasicErrors::CannotReadFileError);
+            return std::unexpected(make_error(ErrorCode::CannotReadFileError, std::format("Cannot open file {}.", path.string())));
 
         std::vector<std::string> lines{};
         std::string line{};
@@ -90,11 +90,11 @@ namespace NeoShafa::Util {
         return lines;
     }
 
-    static inline size_t write_callback(void* ptr, size_t size, size_t nmemb, FILE* stream) {
+    static inline size_t write_callback(void* ptr, size_t size, size_t nmemb, FILE* stream) noexcept {
         return fwrite(ptr, size, nmemb, stream);
     }
 
-    static inline std::expected<void, BasicErrors> download_file(
+    static inline ExpectedVoid download_file(
         std::string_view url,
         const std::filesystem::path& path
     ) {
@@ -102,7 +102,7 @@ namespace NeoShafa::Util {
         std::unique_ptr<CURL, decltype(curl_deleter)> curl(curl_easy_init(), curl_deleter);
 
         if (!curl) {
-            return std::unexpected(BasicErrors::CurlInitError);
+            return std::unexpected(make_error(ErrorCode::CurlInitError, std::format("Cannot init curl {}.", path.string())));
         }
 
         auto file_deleter = [](FILE* f) { if (f) fclose(f); };
@@ -111,7 +111,7 @@ namespace NeoShafa::Util {
             file_deleter
         );
 
-        if (!file) return std::unexpected(BasicErrors::CannotOpenFileError);
+        if (!file) return std::unexpected(make_error(ErrorCode::CannotOpenFileError, std::format("Cannot open file for this: {}.", path.string())));
         std::string url_str{ url };
 
         curl_easy_setopt(curl.get(), CURLOPT_URL, url_str.c_str());
@@ -124,58 +124,63 @@ namespace NeoShafa::Util {
 
         if (res != CURLE_OK) {
             std::filesystem::remove(path);
-            return std::unexpected(BasicErrors::CurlDownloadError);
+            return std::unexpected(make_error(ErrorCode::CurlDownloadError, std::format("Error trying to access: {}.", path.string())));
         }
 
         return {};
     }
 
-    inline static std::expected<std::string, Core::ProjectConfigureErrors> run_command(
+    inline static Expected<std::string> run_command(
         const std::filesystem::path& executable,
-        const std::vector<std::string>& args
+        const std::vector<std::string>& args,
+		int32_t& exitCode
     ) {
-        if (!std::filesystem::exists(executable)) {
-            std::println(
-                std::cerr,
-                "ERROR: Executable not found at {}", \
-                executable.string()
+        if (!std::filesystem::exists(executable))
+            return std::unexpected(
+                Core::make_error(
+                    Core::ErrorCode::RunningCommandError,
+                    std::format("Executable not found at {}", executable.string())
+                )
             );
-            return "";
-        }
 
         BoostProcess::ipstream pipeStream{};
+        BoostProcess::ipstream errorStream{};
         std::string out{};
         try {
             BoostProcess::child child{
                 executable.string(),
                 args,
-                BoostProcess::std_out > pipeStream
+                BoostProcess::std_out > pipeStream,
+                BoostProcess::std_err > errorStream
             };
 
             std::stringstream sstream{};
             sstream << pipeStream.rdbuf();
+            sstream << errorStream.rdbuf();
             out = sstream.str();
 
             child.wait();
+			exitCode = child.exit_code();
             if (child.exit_code() != 0) {
                 std::println(
                     std::cerr,
-                    "ERROR: exited with an error code: {}",
+                    "ERROR: {} exited with an error code: {}",
+                    executable.string(),
                     child.exit_code()
                 );
             }
         }
         catch (const boost::process::process_error& error) {
-            std::println(
-                std::cerr,
-                "ERROR: Error executing vswhere.exe. Is it installed at the specified path?\n\t{}",
-                error.what()
-            );
+            return std::unexpected(
+                Core::make_error(
+                    Core::ErrorCode::RunningCommandError,
+					std::format("Error executing command: {}", error.what())
+                )
+		    );
         }
         if (!out.empty()) {
             out.erase(out.find_last_not_of("\r\n") + 1);
         }
         return out;
     }
-
 }

@@ -22,14 +22,14 @@ namespace NeoShafa {
 		) noexcept : m_projectEnvironment{ projectEnvironment }, m_projectStatistics(projectStatistics) {}
 
 	public:
-		inline std::expected<void, Core::ProjectDataScraperErrors> project_setup()
+		inline Core::ExpectedVoid project_setup()
 		{
 			if (
 				const auto err = Util::is_null(
 					m_projectEnvironment,
 					"Project environment is null."
 				); !err) {
-				return std::unexpected(Core::ProjectDataScraperErrors::GenericProjectSetupError);
+				return std::unexpected(err.error());
 			}
 
 			if (
@@ -37,13 +37,13 @@ namespace NeoShafa {
 					m_projectStatistics,
 					"Project statistics is null."
 				); !err) {
-				return std::unexpected(Core::ProjectDataScraperErrors::GenericProjectSetupError);
+				return std::unexpected(err.error());
 			}
 
 			const std::filesystem::path projectConfigFilePath = m_projectEnvironment->projectRoot / g_projectConfigureFileName;
 
 			if (!std::filesystem::exists(projectConfigFilePath))
-				return std::unexpected(Core::ProjectDataScraperErrors::ProjectConfigFileNotExist);
+				return std::unexpected(Core::make_error(Core::ErrorCode::ProjectConfigFileNotExist, "Cannot finde project configuration fiile."));
 
 
 			auto tryData = toml::try_parse(
@@ -51,17 +51,17 @@ namespace NeoShafa {
 				toml::spec::v(1, 1, 0)
 			);
 			if (!tryData.is_ok())
-				return std::unexpected(Core::ProjectDataScraperErrors::UnexpectedParsingError);
+				return std::unexpected(Core::make_error(Core::ErrorCode::UnexpectedParsingError, "Unexpected parsing error."));
 
 			auto data = tryData.unwrap();
 
-			std::function<std::expected<void, Core::ProjectDataScraperErrors>(
+			std::function<Core::ExpectedVoid(
 				std::string_view,
-				Core::ProjectDataScraperErrors
+				Core::ErrorCode
 			)> check_for_required_key = [&](
 				std::string_view arg_key,
-				Core::ProjectDataScraperErrors error
-				) -> std::expected<void, Core::ProjectDataScraperErrors> {
+				Core::ErrorCode error
+				) -> Core::ExpectedVoid {
 				const std::string_view key{ arg_key };
 				if (data.contains(key.data()) && data.at(key.data()).is_string()) {
 					const auto mapKey = Util::hash(key);
@@ -72,11 +72,11 @@ namespace NeoShafa {
 						// TODO: cast to other types                       .
 						return {};
 					}
-					return std::unexpected(Core::ProjectDataScraperErrors::UnexpectedParsingError);
+					return std::unexpected(Core::make_error(Core::ErrorCode::UnexpectedParsingError, std::format("Cannot parse {}.", key.data())));
 
 				}
 				else
-					return std::unexpected(error);
+					return std::unexpected(Core::make_error(error, ""));
 			};
 
 			std::function<void(std::string_view)> check_for_key = [&](
@@ -96,31 +96,31 @@ namespace NeoShafa {
 
 			auto res = check_for_required_key(
 				"ProjectName",
-				Core::ProjectDataScraperErrors::MissingProjectName
+				Core::ErrorCode::MissingProjectName
 			);
 			if (!res) return res;
 
 			res = check_for_required_key(
 				"ProjectVersion",
-				Core::ProjectDataScraperErrors::MissingProjectVersion
+				Core::ErrorCode::MissingProjectVersion
 			);
 			if (!res) return res;
 
 			res = check_for_required_key(	
 				"ProjectLanguage",
-				Core::ProjectDataScraperErrors::MissingProjectLanguage
+				Core::ErrorCode::MissingProjectLanguage
 			);
 			if (!res) return res;
 
 			res = check_for_required_key(
 				"ProjectType",
-				Core::ProjectDataScraperErrors::MissingProjectType
+				Core::ErrorCode::MissingProjectType
 			);
 			if (!res) return res;
 			if (!ProjectStatistics::is_project_type_supported(
 				m_projectStatistics->projectCompilationData.projectType)
 				)
-				return std::unexpected(Core::ProjectDataScraperErrors::UnexpectedProjectTypeError);
+				return std::unexpected(Core::make_error(Core::ErrorCode::UnexpectedProjectTypeError, std::format("Unexpected project type: {}", m_projectStatistics->projectCompilationData.projectType)));
 			
 			check_for_key("ProjectPrebuild");
 			check_for_key("ProjectPostbuild");

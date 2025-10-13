@@ -20,6 +20,7 @@ namespace NeoShafa::Core {
     } VarName {}
     DEFINE_VERSION(NEOSHAFA_VERSION, 0, 0, 1);
 
+    /*
     enum class BasicErrors : int32_t {
         PointerIsNull = -1,
         CannotReadFileError,
@@ -74,6 +75,69 @@ namespace NeoShafa::Core {
 		FileNotFoundError,
         ExecutionError
     };
+    */
+
+    enum class ErrorCode : int32_t {
+        Unknown = -2,
+
+        PointerIsNull = -1,
+
+        CurlInitError,
+        CurlDownloadError,
+
+        GenericError = 50,
+
+        GenericProjectSetupError = 100,
+        ProjectConfigFileNotExist,
+        UnexpectedParsingError,
+
+        MissingProjectName,
+        MissingProjectVersion,
+        MissingProjectLanguage,
+        MissingProjectType,
+        MissingProjectCVersion,
+        MissingProjectCppVersion,
+
+        UnexpectedProjectTypeError,
+
+        GenericProjectConfigureError = 200,
+        InvalidEnvironmentError,
+        DirectoryIterationError,
+
+        GeneratinFileHashError,
+        GetFileAttributesError,
+        SetFileAttributesError,
+
+        ReadingProjectCahedSourceError,
+
+        InvalidInstallationDirectoryError,
+        InvalidMsvcVersionError,
+        InvalidClPathError,
+
+        GenericBuildError = 300,
+
+		RunningCommandError,
+
+        CannotReadFileError = 400,
+        CannotWriteFileError,
+        CannotOpenFileError,
+        FileNotFoundError,
+        ExecutionError
+    };
+
+    struct Error {
+        ErrorCode code{ ErrorCode::Unknown };
+        std::string message{};
+    };
+
+    constexpr inline Error make_error(const ErrorCode& code, std::string_view msg) {
+        return { code, std::string(msg) };
+    }
+
+    template <typename T>
+    using Expected = std::expected<T, Error>;
+
+    using ExpectedVoid = std::expected<void, Error>;
 
     /*==================================================*/
 

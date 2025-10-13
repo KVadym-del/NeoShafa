@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <print>
 
 #include "Util.hpp"
 #include "ProjectData.hpp"
@@ -17,7 +18,7 @@ namespace NeoShafa {
 			ProjectStatistics* projectStatistics
 		) noexcept : m_projectEnvironment(projectEnvironment), m_projectStatistics(projectStatistics) {}
 
-		inline std::expected<void, Core::ProjectBuildErrors> full_build(
+		inline Core::ExpectedVoid full_build(
 			const std::vector<std::filesystem::path>& diffSource
 		)
 		{ 
@@ -33,30 +34,91 @@ namespace NeoShafa {
 			return {};
 		}
 
-		inline std::expected<void , Core::ProjectBuildErrors > build_to_object(
+		inline Core::ExpectedVoid build_to_object(
 			const std::vector<std::filesystem::path>& diffSource
 		) {	
 			std::vector<std::string> msvcCompileString {
 				std::format("/nologo"),
 				std::format("/c"),
+				std::format("/std:{}", m_projectStatistics->projectCompilationData.cppCompilerVersion),
 				std::format("/Fo:{}", m_projectEnvironment->projectBinaryFolderPath.string().append("\\")),
 				std::format("/Fd:{}", m_projectEnvironment->projectBinaryFolderPath.string().append("\\")),
 				//std::format("/Fe:{}", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string())
 			};
 			std::string otherCompileString{};
 
-			if (m_projectStatistics->projectCompilationData.projectType == (*ProjectCompilationData::supportedProjectTypes)[ProjectCompilationData::supportedProjectTypes.Executable]) {
-				switch (m_projectStatistics->projectCompilationData.projectCompilers)
-				{
+			switch (m_projectStatistics->projectCompilationData.projectCompilers)
+			{
 				case Core::SupportedCompilers::MSVC:
-					for (const auto& filePath : diffSource)
-						msvcCompileString.push_back(std::format("{}", filePath.string()));
-					break;
+				for (const auto& filePath : diffSource)
+					msvcCompileString.push_back(std::format("{}", filePath.string()));
+				break;
 				case Core::SupportedCompilers::Clang:
 				case Core::SupportedCompilers::GCC:
 
-					break;
+				break;
 				default:
+				break;
+			}
+
+			for (const auto& str : msvcCompileString)
+				std::print(" {} ", str);
+
+			std::println();
+
+			int32_t exitCode{};
+			auto res = Util::run_command(
+				m_projectStatistics->projectCompilationData.cppCompilerPath,
+				msvcCompileString,
+				exitCode
+			);
+			if (!res)
+				std::println(std::cerr, "ERROR: {}({})", res.error().message, static_cast<int32_t>(res.error().code));
+
+			std::println("INFO: \n|=>\n{}\n<=|", res.value());
+
+			if (exitCode != 0)
+				return std::unexpected(
+					Core::make_error(
+						Core::ErrorCode::RunningCommandError,
+						std::format("Compiler exited with code: {}.", exitCode)
+					)
+				);
+
+			return {};
+		}
+
+		inline void prebuild() {
+			auto res = ProjectLuaScriptStarter::run(
+				m_projectStatistics->projectPrebuild
+			);
+			if (!res)
+			{
+				std::println(
+					std::cerr,
+					"ERROR: Lua error code: {}({})",
+					res.error().message,
+					static_cast<int32_t>(res.error().code)
+				);
+
+				return;
+			}
+		}
+
+		/*
+		if (m_projectStatistics->projectCompilationData.projectType == (*ProjectCompilationData::supportedProjectTypes)[ProjectCompilationData::supportedProjectTypes.Executable]) {
+
+				switch (m_projectStatistics->projectCompilationData.projectCompilers)
+				{
+					case Core::SupportedCompilers::MSVC:
+					for (const auto& filePath : diffSource)
+						msvcCompileString.push_back(std::format("{}", filePath.string()));
+					break;
+					case Core::SupportedCompilers::Clang:
+					case Core::SupportedCompilers::GCC:
+
+					break;
+					default:
 					break;
 				}
 			}
@@ -91,40 +153,7 @@ namespace NeoShafa {
 					break;
 				}
 			}
-
-			for (const auto& str : msvcCompileString)
-				std::print(" {} ", str);
-
-			std::println();
-
-			auto res = Util::run_command(
-				m_projectStatistics->projectCompilationData.cppCompilerPath,
-				msvcCompileString
-			);
-			if (!res) std::println(std::cerr, "ERROR TEST one: {}", static_cast<int32_t>(res.error()));
-
-			std::string compilingResult = res.value();
-
-			std::println("INFO: Compiling result (\n{}\n)", compilingResult);
-
-			return {};
-		}
-
-		inline void prebuild() {
-			auto res = ProjectLuaScriptStarter::run(
-				m_projectStatistics->projectPrebuild
-			);
-			if (!res)
-			{
-				std::println(
-					std::cerr,
-					"ERROR: Lua error code({})",
-					static_cast<int32_t>(res.error())
-				);
-
-				return;
-			}
-		}
+		*/
 		
 		inline void postbuild() {
 			auto res = ProjectLuaScriptStarter::run(
@@ -134,8 +163,9 @@ namespace NeoShafa {
 			{
 				std::println(
 					std::cerr,
-					"ERROR: Lua error code({})",
-					static_cast<int32_t>(res.error())
+					"ERROR: Lua error code: {}({})",
+					res.error(). message,
+					static_cast<int32_t>(res.error().code)
 				);
 
 				return;
