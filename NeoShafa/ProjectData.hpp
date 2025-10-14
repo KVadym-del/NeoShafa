@@ -95,7 +95,7 @@ namespace NeoShafa {
 		std::string cCompilerFlags{};
 		std::string cCompilerPath{};
 
-		std::string cppCompilerVersion{"c++17"};
+		std::string cppCompilerVersion{"c++20"};
 		std::string cppCompilerFlags{};
 		std::string cppCompilerPath{};
 

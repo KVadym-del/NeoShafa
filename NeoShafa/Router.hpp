@@ -151,12 +151,26 @@ namespace NeoShafa {
                     std::println("INFO: No source files to compile, skipping compilation step.");
                     return; 
                 };
-                for (const auto& [_, path] : *res)
-                    diffSource.push_back(path);
+                const auto tomlConfigPath = std::filesystem::current_path() / "config.toml";
+                for (const auto& [_, path] : *res) {
+                    if (path == tomlConfigPath)
+                    {
+                        std::println("INFO: config.toml changed, doing full rebuild.");
+                        diffSource.clear();
+                        m_projectConfigure.get_all_source_files();
+						auto source = m_projectConfigure.get_source_files();
+                        for (const auto& [_, path] : source)
+							diffSource.push_back(path);
+                        std::erase(diffSource, tomlConfigPath);
+						break;
+                    }
+                    else
+                        diffSource.push_back(path);
+                }
                 if (const auto resScope = m_projectBuild.full_build(diffSource); !resScope)
                     std::println("ERROR: {}({})", resScope.error().message, static_cast<int32_t>(resScope.error().code));
                 else
-                    m_projectConfigure.save_source_cache(); // TODO: Do not save if an error.
+                    m_projectConfigure.save_source_cache();
             }
         }
 

@@ -46,7 +46,6 @@ namespace NeoShafa {
 				std::format("/std:{}", m_projectStatistics->projectCompilationData.cppCompilerVersion),
 				std::format("/Fo:{}", m_projectEnvironment->projectBinaryFolderPath.string().append("\\")),
 				std::format("/Fd:{}", m_projectEnvironment->projectBinaryFolderPath.string().append("\\")),
-				//std::format("/Fe:{}", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string())
 			};
 			std::string otherCompileString{};
 
@@ -54,8 +53,10 @@ namespace NeoShafa {
 			switch (m_projectStatistics->projectCompilationData.projectCompilers)
 			{
 				case Core::SupportedCompilers::MSVC:
-				for (const auto& filePath : diffSource)
-					msvcCompileString.push_back(std::format("{}", filePath.string()));
+				for (const auto& filePath : diffSource) {
+					if (filePath.extension() != ".toml")
+						msvcCompileString.push_back(std::format("{}", filePath.string()));
+				}
 				break;
 				case Core::SupportedCompilers::Clang:
 				case Core::SupportedCompilers::GCC:

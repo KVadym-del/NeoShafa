@@ -80,7 +80,7 @@ namespace NeoShafa {
 				);
 			}
 
-			const std::array<std::string, 3> sourceExtensions { ".cpp", ".cxx", ".inl" };
+			const std::array<std::string, 4> sourceExtensions { ".cpp", ".cxx", ".inl", ".toml" };
 
 			try
 			{
