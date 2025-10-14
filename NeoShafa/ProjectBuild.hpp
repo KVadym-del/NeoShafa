@@ -50,6 +50,7 @@ namespace NeoShafa {
 			};
 			std::string otherCompileString{};
 
+			
 			switch (m_projectStatistics->projectCompilationData.projectCompilers)
 			{
 				case Core::SupportedCompilers::MSVC:
@@ -62,6 +63,23 @@ namespace NeoShafa {
 				break;
 				default:
 				break;
+			}
+
+			if (m_projectStatistics->projectCompilationData.projectType == (*ProjectCompilationData::supportedProjectTypes)[ProjectCompilationData::supportedProjectTypes.DynamicLibrary]) {
+				switch (m_projectStatistics->projectCompilationData.projectCompilers)
+				{
+					case Core::SupportedCompilers::MSVC:
+					for (const auto& filePath : diffSource)
+						msvcCompileString.push_back(std::format("/D_WINDLL"));
+						msvcCompileString.push_back(std::format("/DMY_DLL_EXPORTS"));
+					break;
+					case Core::SupportedCompilers::Clang:
+					case Core::SupportedCompilers::GCC:
+
+					break;
+					default:
+					break;
+				}
 			}
 
 			std::println("COMPILING");
@@ -140,7 +158,8 @@ namespace NeoShafa {
 				switch (m_projectStatistics->projectCompilationData.projectCompilers)
 				{
 					case Core::SupportedCompilers::MSVC:
-
+					msvcCompileString.push_back(std::format("/OUT:{}.lib", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string()));
+					process = m_projectStatistics->projectCompilationData.projectLibPath;
 					break;
 					case Core::SupportedCompilers::Clang:
 					case Core::SupportedCompilers::GCC:
@@ -154,7 +173,9 @@ namespace NeoShafa {
 				switch (m_projectStatistics->projectCompilationData.projectCompilers)
 				{
 					case Core::SupportedCompilers::MSVC:
-
+					msvcCompileString.push_back(std::format("/DLL"));
+					msvcCompileString.push_back(std::format("/OUT:{}.dll", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string()));
+					process = m_projectStatistics->projectCompilationData.projectLinkerPath;
 					break;
 					case Core::SupportedCompilers::Clang:
 					case Core::SupportedCompilers::GCC:
