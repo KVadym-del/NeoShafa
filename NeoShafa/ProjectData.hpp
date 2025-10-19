@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string_view>
 #include <print>
+#include <vector>
 #include <variant>
 #include <unordered_map>
 #include <array>
@@ -13,6 +14,7 @@
 namespace NeoShafa {
 	using basicUnified = std::variant<
 		std::string*,
+		std::vector<std::string>*,
 		Core::SupportedCompilers*,
 		Core::SupportedTargets*
 	>;
@@ -92,18 +94,22 @@ namespace NeoShafa {
 #endif
 
 		std::string cCompilerVersion{"c99"};
-		std::string cCompilerFlags{};
 		std::string cCompilerPath{};
 
 		std::string cppCompilerVersion{"c++20"};
-		std::string cppCompilerFlags{};
 		std::string cppCompilerPath{};
 
-		std::string projectLibFlags{};
 		std::string projectLibPath{};
 
-		std::string projectLinkerFlags{};
 		std::string projectLinkerPath{};
+
+		std::vector<std::string> cCompilerFlags{};
+		std::vector<std::string> cppCompilerFlags{};
+		std::vector<std::string> msvcCompilerFlags{};
+		std::vector<std::string> projectLibFlags{};
+		std::vector<std::string> MSVCProjectLibFlags{};
+		std::vector<std::string> projectLinkerFlags{};
+		std::vector<std::string> MSVCProjectLinkerFlags{};
 	};
 
 	struct ProjectStatistics {
@@ -158,6 +164,11 @@ namespace NeoShafa {
 				Util::hash(nameToHash),
 				&projectCompilationData.cppCompilerFlags
 			);
+			nameToHash = "msvcCompilerFlags";
+			variablesSignatures.emplace(
+				Util::hash(nameToHash),
+				&projectCompilationData.msvcCompilerFlags
+			);
 
 
 			nameToHash = "ProjectPrebuild";
@@ -169,6 +180,28 @@ namespace NeoShafa {
 			variablesSignatures.emplace(
 				Util::hash(nameToHash),
 				&projectPostbuild
+			);
+
+			nameToHash = "projectLibFlags";
+			variablesSignatures.emplace(
+				Util::hash(nameToHash),
+				&projectCompilationData.projectLibFlags
+			);
+			nameToHash = "MSVCProjectLibFlags";
+			variablesSignatures.emplace(
+				Util::hash(nameToHash),
+				&projectCompilationData.MSVCProjectLibFlags
+			);
+
+			nameToHash = "projectLinkerFlags";
+			variablesSignatures.emplace(
+				Util::hash(nameToHash),
+				&projectCompilationData.projectLinkerFlags
+			);
+			nameToHash = "MSVCProjectLinkerFlags";
+			variablesSignatures.emplace(
+				Util::hash(nameToHash),
+				&projectCompilationData.MSVCProjectLinkerFlags
 			);
 
 		}

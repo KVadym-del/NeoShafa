@@ -118,6 +118,13 @@ namespace NeoShafa {
 
 		}
 
+		inline Core::ExpectedVoid clean_source_cache()
+		{
+			if (std::filesystem::exists(m_projectEnvironment->projectSourceCacheFilePath))
+				Util::write(m_projectEnvironment->projectSourceCacheFilePath, "");
+			return {};
+		}
+
 		inline Core::ExpectedVoid save_source_cache()
 		{
 			bool firstTime{ true };

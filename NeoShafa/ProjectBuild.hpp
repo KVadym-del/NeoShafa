@@ -49,6 +49,7 @@ namespace NeoShafa {
 			};
 			std::string otherCompileString{};
 
+
 			
 			switch (m_projectStatistics->projectCompilationData.projectCompilers)
 			{
@@ -56,6 +57,9 @@ namespace NeoShafa {
 				for (const auto& filePath : diffSource) {
 					if (filePath.extension() != ".toml")
 						msvcCompileString.push_back(std::format("{}", filePath.string()));
+
+					for (const auto& flag : m_projectStatistics->projectCompilationData.msvcCompilerFlags)
+						msvcCompileString.push_back(flag);
 				}
 				break;
 				case Core::SupportedCompilers::Clang:
@@ -70,9 +74,13 @@ namespace NeoShafa {
 				switch (m_projectStatistics->projectCompilationData.projectCompilers)
 				{
 					case Core::SupportedCompilers::MSVC:
-					for (const auto& filePath : diffSource)
+					for (const auto& filePath : diffSource) {
 						msvcCompileString.push_back(std::format("/D_WINDLL"));
 						msvcCompileString.push_back(std::format("/DMY_DLL_EXPORTS"));
+					}
+
+					for (const auto& flag : m_projectStatistics->projectCompilationData.msvcCompilerFlags)
+						msvcCompileString.push_back(flag);
 					break;
 					case Core::SupportedCompilers::Clang:
 					case Core::SupportedCompilers::GCC:
@@ -160,6 +168,8 @@ namespace NeoShafa {
 				{
 					case Core::SupportedCompilers::MSVC:
 					msvcCompileString.push_back(std::format("/OUT:{}.lib", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string()));
+					for (const auto& flag : m_projectStatistics->projectCompilationData.projectLibFlags)
+						msvcCompileString.push_back(flag);
 					process = m_projectStatistics->projectCompilationData.projectLibPath;
 					break;
 					case Core::SupportedCompilers::Clang:
@@ -176,6 +186,8 @@ namespace NeoShafa {
 					case Core::SupportedCompilers::MSVC:
 					msvcCompileString.push_back(std::format("/DLL"));
 					msvcCompileString.push_back(std::format("/OUT:{}.dll", (m_projectEnvironment->projectBinaryFolderPath / m_projectStatistics->projectName).string()));
+					for (const auto& flag : m_projectStatistics->projectCompilationData.projectLinkerFlags)
+						msvcCompileString.push_back(flag);
 					process = m_projectStatistics->projectCompilationData.projectLinkerPath;
 					break;
 					case Core::SupportedCompilers::Clang:

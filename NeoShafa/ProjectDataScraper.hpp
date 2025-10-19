@@ -89,20 +89,48 @@ namespace NeoShafa {
 					return std::unexpected(Core::make_error(error, ""));
 			};
 
-			std::function<void(std::string_view)> check_for_key = [&](
-				std::string_view arg_key
-			) {
-				const std::string_view key{ arg_key };
-				if (data.contains(key.data()) && data.at(key.data()).is_string()) {
-					const auto mapKey = Util::hash(key);
-					if (const auto it = m_projectStatistics->variablesSignatures.find(mapKey);
-						it != m_projectStatistics->variablesSignatures.end()) {
-						std::string dataStr = data.at(key.data()).as_string();
-						if (dataStr.empty()) std::println("WARNING: field of {} is empty.", key.data());
-						*std::get<std::string*>(it->second) = dataStr;
+			std::function<void(std::string_view, bool)> check_for_key = [&](
+				std::string_view arg_key,
+				bool isArray
+				) {
+					const std::string_view key{ arg_key };
+					if (isArray) {
+						if (data.contains(key.data()) && data.at(key.data()).is_array()) {
+							const auto mapKey = Util::hash(key);
+							if (const auto it = m_projectStatistics->variablesSignatures.find(mapKey);
+								it != m_projectStatistics->variablesSignatures.end()) {
+								const auto& array = data.at(key.data()).as_array();
+								try
+								{
+									auto* vecPtr = std::get<std::vector<std::string>*>(it->second);
+									vecPtr->clear();
+									vecPtr->reserve(array.size());
+									for (const auto& element : array) {
+										if (element.is_string()) {
+											vecPtr->push_back(element.as_string());
+										}
+									}
+
+								}
+								catch (const std::exception& err)
+								{
+									std::print("ERROR: {}.", err.what());
+								}
+							}
+						}
 					}
-				}
-			};
+					else {
+						if (data.contains(key.data()) && data.at(key.data()).is_string()) {
+							const auto mapKey = Util::hash(key);
+							if (const auto it = m_projectStatistics->variablesSignatures.find(mapKey);
+								it != m_projectStatistics->variablesSignatures.end()) {
+								std::string dataStr = data.at(key.data()).as_string();
+								if (dataStr.empty()) std::println("WARNING: field of {} is empty.", key.data());
+								*std::get<std::string*>(it->second) = dataStr;
+							}
+						}
+					}
+				};
 
 			auto res = check_for_required_key(
 				"ProjectName",
@@ -132,11 +160,21 @@ namespace NeoShafa {
 				)
 				return std::unexpected(Core::make_error(Core::ErrorCode::UnexpectedProjectTypeError, std::format("Unexpected project type: {}", m_projectStatistics->projectCompilationData.projectType)));
 			
-			check_for_key("ProjectPrebuild");
-			check_for_key("ProjectPostbuild");
+			check_for_key("ProjectPrebuild", false);
+			check_for_key("ProjectPostbuild", false);
 
-			check_for_key("cCompilerVersion");
-			check_for_key("cppCompilerVersion");
+			check_for_key("cCompilerVersion", false);
+			check_for_key("cppCompilerVersion", false);
+
+			check_for_key("cCompilerFlags", true);
+			check_for_key("cppCompilerFlags", true);
+			check_for_key("msvcCompilerFlags", true);
+
+			check_for_key("projectLibFlags", true);
+			check_for_key("MSVCProjectLibFlags", true);
+
+			check_for_key("projectLinkerFlags", true);
+			check_for_key("MSVCProjectLinkerFlags", true);
 
 			return {};
 		}

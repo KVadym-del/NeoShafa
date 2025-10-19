@@ -18,64 +18,7 @@ namespace NeoShafa::Core {
             return STRINGIFY(Major) "." STRINGIFY(Minor) "." STRINGIFY(Patch);      \
         }                                                                           \
     } VarName {}
-    DEFINE_VERSION(NEOSHAFA_VERSION, 0, 0, 1);
-
-    /*
-    enum class BasicErrors : int32_t {
-        PointerIsNull = -1,
-        CannotReadFileError,
-        CannotWriteFileError,
-        CannotOpenFileError,
-
-        CurlInitError,
-        CurlDownloadError,
-    };
-
-    enum class RouterErrors : int32_t {
-        GenericError = 1
-    };
-
-    enum class ProjectDataScraperErrors : int32_t {
-        GenericProjectSetupError = 100,
-        ProjectConfigFileNotExist,
-        UnexpectedParsingError,
-
-        MissingProjectName,
-        MissingProjectVersion,
-        MissingProjectLanguage,
-        MissingProjectType,
-        MissingProjectCVersion,
-        MissingProjectCppVersion,
-
-        UnexpectedProjectTypeError,
-    };
-
-    enum class ProjectConfigureErrors : int32_t {
-        GenericProjectConfigureError = 200,
-        InvalidEnvironmentError,
-        DirectoryIterationError,
-
-        GeneratinFileHashError,
-        GetFileAttributesError,
-        SetFileAttributesError,
-
-        ReadingProjecCahedSourceError,
-
-        InvalidInstallationDirectoryError,
-        InvalidMsvcVersionError,
-        InvalidClPathError,
-    };
-
-    enum class ProjectBuildErrors : int32_t {
-        GenericBuildError = 300,
-    };
-
-    enum class LuaError : int32_t {
-		CannotReadFileError = 400,
-		FileNotFoundError,
-        ExecutionError
-    };
-    */
+    DEFINE_VERSION(NEOSHAFA_VERSION, 0, 1, 1);
 
     enum class ErrorCode : int32_t {
         Unknown = -2,

@@ -156,13 +156,16 @@ namespace NeoShafa {
                     if (path == tomlConfigPath)
                     {
                         std::println("INFO: config.toml changed, doing full rebuild.");
+
+                        m_projectConfigure.clean_source_cache();
                         diffSource.clear();
-                        m_projectConfigure.get_all_source_files();
-						auto source = m_projectConfigure.get_source_files();
+
+                        auto source = m_projectConfigure.get_source_files();
                         for (const auto& [_, path] : source)
-							diffSource.push_back(path);
+                            diffSource.push_back(path);
+
                         std::erase(diffSource, tomlConfigPath);
-						break;
+                        break;
                     }
                     else
                         diffSource.push_back(path);
